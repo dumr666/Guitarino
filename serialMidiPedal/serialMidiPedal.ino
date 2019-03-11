@@ -1,4 +1,3 @@
-
 /*
  * Midi pedal board, needs software installed for emulating midi
  * 
@@ -16,79 +15,89 @@
 #include <Wire.h>
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
-
+#include <MIDI.h>
 // custom libs
 #include "ioDlib.h"
 #include "Debounce.h"
 
 // Defines
+// IO Defines
+// LED defines
 #define ledPin 13
 #define doL1 3
 #define doL2 4
 #define doL3 5
 #define doL4 6
-
-#define diB1 7
-#define diB2 8
-#define diB3 9
-
-#define SCREEN_WIDTH 128 // OLED display width, in pixels
-#define SCREEN_HEIGHT 64 // OLED display height, in pixels
-
-// Declaration for an SSD1306 display connected to I2C (SDA, SCL pins)
-#define OLED_RESET -1 // Reset pin # (or -1 if sharing Arduino reset pin)
-Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
-
-// Define global vars
 // LED states
 short doL1s = LOW;
 short doL2s = LOW;
 short doL3s = LOW;
 short doL4s = LOW;
-// debounce for first button
-unsigned long longTickCnt = 0;     // debounce start time for B1
-unsigned long timeDebouncing = 20; // how long to wait for debounce
 
+// Button Defines
+#define diB1 7
+#define diB2 8
+#define diB3 9
+unsigned long buttonDebounceTime = 20; // how long to wait for debounce
+
+// OLED Variables
+#define SCREEN_WIDTH 128 // OLED display width, in pixels
+#define SCREEN_HEIGHT 64 // OLED display height, in pixels
+// Declaration for an SSD1306 display connected to I2C (SDA, SCL pins)
+#define OLED_RESET -1 // Reset pin # (or -1 if sharing Arduino reset pin)
+Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
+
+#define MIDI_CHAN
+long longTickCnt = 0;
 // ioDLib init
 ioDlib pin(ledPin);
 // Debounce lib init
-Debounce diBut1(diB1, 30);
-Debounce diBut2(diB2, 30);
-Debounce diBut3(diB3, 30);
+Debounce diBut1(diB1, buttonDebounceTime);
+Debounce diBut2(diB2, buttonDebounceTime);
+Debounce diBut3(diB3, buttonDebounceTime);
+// Button array
+uint8_t inStates[3] = {LOW, LOW, LOW};
+uint8_t inOldStates[3] = {LOW, LOW, LOW};
+uint8_t inChangedStates[3] = {LOW, LOW, LOW};
+byte ccCommands[3] = {80, 81, 82};
+// LED array
+uint8_t outStates[3] = {LOW, LOW, LOW};
+uint8_t outLEDs[3] = {doL1, doL2, doL3};
 
-/*************************/
-/********* MAIN **********/
-/*************************/
-
-/*******   SETUP   *******/
 uint8_t randX = 0;
 uint8_t randY = 0;
 int randr = 0;
+
+MIDI_CREATE_DEFAULT_INSTANCE();
+
+/**************************************************/
+/*******   SETUP   ********************************/
+/*******   LOOP    *******************************/
+/**************************************************/
 void setup()
 {
-  randomSeed(analogRead(0));
+  MIDI.begin(8);
   setupIOs();
   setupOled();
-  Serial.begin(115200);
+  //Serial.begin(115200);
   pin.setupTimer1(); // setup interrupt
 }
 
-/*******   LOOP   *******/
+/**************************************************/
+/********  MAIN   *********************************/
+/********  LOOP   *********************************/
+/**************************************************/
 void loop()
 {
-
-  display.clearDisplay();
-  digitalWrite(doL1, diBut1.read());
-  digitalWrite(doL2, diBut2.read());
-  digitalWrite(doL3, diBut3.count() % 2);
-
-  //testanimate(logo_bmp, LOGO_WIDTH, LOGO_HEIGHT); // Animate bitmaps
-
+  readInputs();
+  inputChanged();
+  lightLED();
   if (timer1Tick == true)
   {
+    applyChanges();
+    
+  display.clearDisplay();
     longTickCnt++;
-    // Drawing
-
     randX = random(64);
     randY = random(64);
     //display.clearDisplay();
@@ -103,6 +112,7 @@ void loop()
     {
       longTickCnt = 0;
     }
+    clearChanges();
     //digitalWrite(doL4, !digitalRead(doL4));
     timer1Tick = false;
   }
@@ -148,11 +158,58 @@ void setupOled()
 
   // Clear the buffer
   display.clearDisplay();
-  display.setRotation(1);
-
+  //display.setRotation(1);
   // Draw a single pixel in white
   display.drawPixel(10, 10, WHITE);
   // Show the display buffer on the screen. You MUST call display() after
   // drawing commands to make them visible on screen!
   display.display();
+}
+
+void readInputs()
+{
+  inStates[0] = diBut1.read();
+  inStates[1] = diBut2.read();
+  inStates[2] = diBut3.read();
+  //digitalWrite(doL3, diBut3.count() % 2);  // TOGGLE
+}
+
+void inputChanged()
+{
+  for(uint8_t i = 0; i << (sizeof(inStates) / sizeof(inStates[0])); i++ )
+  {
+    if (inStates[i] != inOldStates[i]) {
+      if (inStates[i] == HIGH) {
+        inChangedStates[i] = HIGH;
+      }
+    }
+  }
+}
+
+void clearChanges()
+{
+  for(uint8_t i = 0; i << (sizeof(inChangedStates) / sizeof(inChangedStates[0])); i++) 
+  {
+    inChangedStates[i] = LOW;
+  }
+}
+
+void applyChanges()
+{
+  for(uint8_t i = 0; i << (sizeof(inChangedStates) / sizeof(inChangedStates[0])); i++ )
+  {
+    if (inChangedStates[i] == HIGH) {
+      MIDI.sendControlChange(ccCommands[i],127,1);
+      outStates[i] = HIGH;
+    }
+  }
+}
+
+
+void lightLED()
+{
+  for(uint8_t i = 0; i << (sizeof(inChangedStates) / sizeof(inChangedStates[0])); i++ )
+  {
+    digitalWrite(outLEDs[i], inChangedStates[i]);
+  }
 }
