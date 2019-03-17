@@ -31,8 +31,8 @@ void ioDlib::setupTimer1()
     TCCR1A = 0; // set entire TCCR1A register to 0
     TCCR1B = 0; // same for TCCR1B
     TCNT1 = 0;  // initialize counter value to 0
-    // 4 Hz(16000000 / ((15624 + 1) * 256))
-    OCR1A = 15624;
+        // 10 Hz (16000000/((6249+1)*256))
+    OCR1A = 6249;
     // CTC
     TCCR1B |= (1 << WGM12);
     // Prescaler 256

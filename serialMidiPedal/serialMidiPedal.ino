@@ -8,17 +8,15 @@
 
 // Includes
 // Arduino official libs
-#include <Adafruit_SSD1306.h>
-#include <splash.h>
 
 #include <SPI.h>
 #include <Wire.h>
-#include <Adafruit_GFX.h>
-#include <Adafruit_SSD1306.h>
 #include <MIDI.h>
+#include <EasyButton.h>
+#include <SSD1306Ascii.h>
+#include <SSD1306AsciiWire.h>
 // custom libs
 #include "ioDlib.h"
-#include "Debounce.h"
 
 // Defines
 // IO Defines
@@ -43,22 +41,29 @@ unsigned long buttonDebounceTime = 20; // how long to wait for debounce
 // OLED Variables
 #define SCREEN_WIDTH 128 // OLED display width, in pixels
 #define SCREEN_HEIGHT 64 // OLED display height, in pixels
+// Define proper RST_PIN if required.
+#define RST_PIN -1
+// 0X3C+SA0 - 0x3C or 0x3D
+#define I2C_ADDRESS 0x3C
+SSD1306AsciiWire oled;
 // Declaration for an SSD1306 display connected to I2C (SDA, SCL pins)
-#define OLED_RESET -1 // Reset pin # (or -1 if sharing Arduino reset pin)
-Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 
 #define MIDI_CHAN
 long longTickCnt = 0;
 // ioDLib init
+int timer1TickCounter = 0;
 ioDlib pin(ledPin);
-// Debounce lib init
-Debounce diBut1(diB1, buttonDebounceTime);
-Debounce diBut2(diB2, buttonDebounceTime);
-Debounce diBut3(diB3, buttonDebounceTime);
+// Instance of the button.
+EasyButton diBut1(diB1, 20, false, false);
+EasyButton diBut2(diB2, 20, false, false);
+EasyButton diBut3(diB3, 20, false, false);
+
 // Button array
-uint8_t inStates[3] = {LOW, LOW, LOW};
-uint8_t inOldStates[3] = {LOW, LOW, LOW};
-uint8_t inChangedStates[3] = {LOW, LOW, LOW};
+bool bReadChanges = false;
+bool inStates[3] = {false, false, false};
+bool inOldStates[3] = {false, false, false};
+bool inChangedStates[3] = {false, false, false};
+uint8_t inArrayLength = (sizeof(inChangedStates) / sizeof(inChangedStates[0]));
 byte ccCommands[3] = {80, 81, 82};
 // LED array
 uint8_t outStates[3] = {LOW, LOW, LOW};
@@ -76,10 +81,10 @@ MIDI_CREATE_DEFAULT_INSTANCE();
 /**************************************************/
 void setup()
 {
-  MIDI.begin(8);
+  //MIDI.begin();
+  Serial.begin(115200);
   setupIOs();
   setupOled();
-  //Serial.begin(115200);
   pin.setupTimer1(); // setup interrupt
 }
 
@@ -90,29 +95,21 @@ void setup()
 void loop()
 {
   readInputs();
-  inputChanged();
   lightLED();
   if (timer1Tick == true)
   {
-    applyChanges();
-    
-  display.clearDisplay();
-    longTickCnt++;
-    randX = random(64);
-    randY = random(64);
-    //display.clearDisplay();
-    display.setCursor(randX, randY);
-    display.drawPixel(randX, randY, WHITE);
-    display.setTextColor(WHITE);
-    display.setCursor(16, 70);
-    display.setTextSize(8);
-    display.print(longTickCnt);
-    display.display();
-    if (longTickCnt == 9)
+
+    printInputs();
+    timer1TickCounter++;
+    if (timer1TickCounter == 10)
     {
-      longTickCnt = 0;
+      setChanges();
+      //printInputs();
+      digitalWrite(13, !digitalRead(13));
+      timer1Second();
+      bReadChanges = false;
+      resetChangedStates();
     }
-    clearChanges();
     //digitalWrite(doL4, !digitalRead(doL4));
     timer1Tick = false;
   }
@@ -137,79 +134,109 @@ void setupIOs()
   pinMode(doL4, OUTPUT);
 
   // setup three in Buttons
-  pinMode(diB1, INPUT);
-  pinMode(diB2, INPUT);
-  pinMode(diB3, INPUT);
+  diBut1.begin();
+  diBut2.begin();
+  diBut3.begin();
 }
 
 // Setup OLED1306 with Adafruit_SSD1306
 void setupOled()
 {
-   if (!display.begin(SSD1306_SWITCHCAPVCC, 0x3C))
-  { // Address 0x3D for 128x64
-    Serial.println(F("SSD1306 allocation failed"));
-    for (;;)
-      ; // Don't proceed, loop forever
-  }
-  // Show initial display buffer contents on the screen --
-  // the library initializes this with an Adafruit splash screen.
-  display.display();
-  //delay(2000); // Pause for 2 seconds
+  Wire.begin();
+  Wire.setClock(400000L);
 
-  // Clear the buffer
-  display.clearDisplay();
-  //display.setRotation(1);
-  // Draw a single pixel in white
-  display.drawPixel(10, 10, WHITE);
-  // Show the display buffer on the screen. You MUST call display() after
-  // drawing commands to make them visible on screen!
-  display.display();
+#if RST_PIN >= 0
+  oled.begin(&Adafruit128x64, I2C_ADDRESS, RST_PIN);
+#else  // RST_PIN >= 0
+  oled.begin(&Adafruit128x64, I2C_ADDRESS);
+#endif // RST_PIN >= 0
+  oled.setFont(Stang5x7);
+  oled.set2X();
+  oled.clear();
+  //oled.setLetterSpacing(0);
+  oled.setCursor(0, 0);
+  oled.print("SUPRISE");
+  oled.setCursor(0, 4);
+  oled.print("motherfucker!");
+  delay(500);
+  oled.clear();
+}
+
+void printCommandNum(int num, String type)
+{
+  oled.clear();
+  oled.setFont(lcdnums14x24);
+  oled.set2X();
+  oled.home();
+  oled.print(num);
+  oled.setFont(ZevvPeep8x16);
+  oled.setCursor(80,0);
+  oled.set2X();
+  oled.print(type);
 }
 
 void readInputs()
 {
-  inStates[0] = diBut1.read();
-  inStates[1] = diBut2.read();
-  inStates[2] = diBut3.read();
-  //digitalWrite(doL3, diBut3.count() % 2);  // TOGGLE
-}
-
-void inputChanged()
-{
-  for(uint8_t i = 0; i << (sizeof(inStates) / sizeof(inStates[0])); i++ )
+  diBut1.read();
+  diBut2.read();
+  diBut3.read();
+  inStates[0] = diBut1.isPressed();
+  inStates[1] = diBut2.isPressed();
+  inStates[2] = diBut3.isPressed();
+  for (uint8_t i = 0; i < inArrayLength; i++)
   {
-    if (inStates[i] != inOldStates[i]) {
-      if (inStates[i] == HIGH) {
-        inChangedStates[i] = HIGH;
-      }
+    if ((inStates[i] == true) && (inChangedStates[i] == false))
+    {
+      bReadChanges = true;
+      inChangedStates[i] = inStates[i];
     }
   }
 }
 
-void clearChanges()
+void resetChangedStates()
 {
-  for(uint8_t i = 0; i << (sizeof(inChangedStates) / sizeof(inChangedStates[0])); i++) 
+  for (uint8_t i = 0; i < inArrayLength; i++)
   {
-    inChangedStates[i] = LOW;
+    inChangedStates[i] = false;
   }
 }
 
-void applyChanges()
+void setChanges()
 {
-  for(uint8_t i = 0; i << (sizeof(inChangedStates) / sizeof(inChangedStates[0])); i++ )
+  for (uint8_t i = 0; i < inArrayLength; i++)
   {
-    if (inChangedStates[i] == HIGH) {
-      MIDI.sendControlChange(ccCommands[i],127,1);
-      outStates[i] = HIGH;
+    if (inChangedStates[i] == true)
+    {
+      Serial.println(ccCommands[i]);
+      printCommandNum(ccCommands[i], "CC");
     }
   }
 }
-
 
 void lightLED()
 {
-  for(uint8_t i = 0; i << (sizeof(inChangedStates) / sizeof(inChangedStates[0])); i++ )
-  {
-    digitalWrite(outLEDs[i], inChangedStates[i]);
-  }
+
+  digitalWrite(doL1, inChangedStates[0]);
+  digitalWrite(doL2, inChangedStates[1]);
+  digitalWrite(doL3, inChangedStates[2]);
+}
+
+void timer1Second()
+{
+  longTickCnt++;
+  // Set counter for 10hz to 0
+  timer1TickCounter = 0;
+}
+
+void printInputs()
+{
+  Serial.print("B1:");
+  Serial.print(inChangedStates[0]);
+  Serial.print("\t");
+  Serial.print("B1:");
+  Serial.print(inChangedStates[1]);
+  Serial.print("\t");
+  Serial.print("B1:");
+  Serial.print(inChangedStates[2]);
+  Serial.println("\t");
 }
