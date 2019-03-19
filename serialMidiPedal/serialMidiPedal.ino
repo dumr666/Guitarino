@@ -22,10 +22,10 @@
 // IO Defines
 // LED defines
 #define ledPin 13
-#define doL1 3
-#define doL2 4
-#define doL3 5
-#define doL4 6
+#define doL1 4
+#define doL2 5
+#define doL3 6
+#define doL4 7
 // LED states
 short doL1s = LOW;
 short doL2s = LOW;
@@ -33,9 +33,9 @@ short doL3s = LOW;
 short doL4s = LOW;
 
 // Button Defines
-#define diB1 7
-#define diB2 8
-#define diB3 9
+#define diB1 8
+#define diB2 9
+#define diB3 10
 unsigned long buttonDebounceTime = 20; // how long to wait for debounce
 
 // OLED Variables
@@ -64,7 +64,7 @@ bool inStates[3] = {false, false, false};
 bool inOldStates[3] = {false, false, false};
 bool inChangedStates[3] = {false, false, false};
 uint8_t inArrayLength = (sizeof(inChangedStates) / sizeof(inChangedStates[0]));
-byte ccCommands[3] = {80, 81, 82};
+byte ccCommands[3] = {111, 81, 82};
 // LED array
 uint8_t outStates[3] = {LOW, LOW, LOW};
 uint8_t outLEDs[3] = {doL1, doL2, doL3};
@@ -160,6 +160,7 @@ void setupOled()
   oled.print("motherfucker!");
   delay(500);
   oled.clear();
+  printBlank();
 }
 
 void printCommandNum(int num, String type)
@@ -170,9 +171,22 @@ void printCommandNum(int num, String type)
   oled.home();
   oled.print(num);
   oled.setFont(ZevvPeep8x16);
-  oled.setCursor(80,0);
+  oled.setCursor(100,0);
   oled.set2X();
   oled.print(type);
+}
+
+void printBlank()
+{
+  oled.clear();
+  oled.setFont(lcdnums14x24);
+  oled.set2X();
+  oled.home();
+  oled.print("---");
+  oled.setFont(ZevvPeep8x16);
+  oled.setCursor(100,0);
+  oled.set2X();
+  oled.print("--");
 }
 
 void readInputs()
