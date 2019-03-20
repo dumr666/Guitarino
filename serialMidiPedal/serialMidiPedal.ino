@@ -22,10 +22,10 @@
 // IO Defines
 // LED defines
 #define ledPin 13
-#define doL1 4
-#define doL2 5
-#define doL3 6
-#define doL4 7
+#define doL1 15
+#define doL2 14
+#define doL3 16
+#define doL4 8
 // LED states
 short doL1s = LOW;
 short doL2s = LOW;
@@ -33,9 +33,10 @@ short doL3s = LOW;
 short doL4s = LOW;
 
 // Button Defines
-#define diB1 8
-#define diB2 9
-#define diB3 10
+#define diB1 A3
+#define diB2 A2
+#define diB3 A1
+#define diB4 A0
 unsigned long buttonDebounceTime = 20; // how long to wait for debounce
 
 // OLED Variables
@@ -57,20 +58,23 @@ ioDlib pin(ledPin);
 EasyButton diBut1(diB1, 20, false, false);
 EasyButton diBut2(diB2, 20, false, false);
 EasyButton diBut3(diB3, 20, false, false);
+EasyButton diBut4(diB4, 20);
 
 // Button array
 bool bReadChanges = false;
-bool inStates[3] = {false, false, false};
-bool inOldStates[3] = {false, false, false};
-bool inChangedStates[3] = {false, false, false};
+bool inStates[] = {false, false, false, false};
+bool inOldStates[] = {false, false, false, false};
+bool inChangedStates[] = {false, false, false, false};
 uint8_t inArrayLength = (sizeof(inChangedStates) / sizeof(inChangedStates[0]));
-byte ccCommands[3] = {111, 81, 82};
+byte ccCommands[] = {111, 81, 82, 75};
 // LED array
-uint8_t outStates[3] = {LOW, LOW, LOW};
-uint8_t outLEDs[3] = {doL1, doL2, doL3};
+uint8_t outStates[] = {LOW, LOW, LOW, LOW};
+uint8_t outLEDs[] = {doL1, doL2, doL3, doL4};
+unsigned long secMillisLedStart = {0, 0, 0, 0};
+unsigned long secMillisLedCurr = {0, 0, 0, 0};
 
-uint8_t randX = 0;
-uint8_t randY = 0;
+
+unsigned long secMillisStart = 0;
 int randr = 0;
 
 MIDI_CREATE_DEFAULT_INSTANCE();
@@ -247,10 +251,26 @@ void printInputs()
   Serial.print("B1:");
   Serial.print(inChangedStates[0]);
   Serial.print("\t");
-  Serial.print("B1:");
+  Serial.print("B2:");
   Serial.print(inChangedStates[1]);
   Serial.print("\t");
-  Serial.print("B1:");
+  Serial.print("B3:");
   Serial.print(inChangedStates[2]);
+  Serial.print("\t");
+  Serial.print("B4:");
+  Serial.print(inChangedStates[3]);
   Serial.println("\t");
+}
+
+// Finish stuff after one second
+void oneSecond()
+{
+  for (uint8_t i = 0; i < inArrayLength; i++)
+  {
+    
+  }
+  if ((secMillisCurr - secMillisStart) >= 1000)
+  {
+    
+  }
 }
