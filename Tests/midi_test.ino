@@ -1,3 +1,5 @@
+// MIDI TESTING INO FOR SERIAL MIDI
+
 #include <MIDI.h>
 #include <Bounce2.h>
 

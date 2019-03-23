@@ -4,6 +4,9 @@
  * Author: Denis Leskovar
  * Email: dumr666@gmail.com
  * 
+ * Known bugs:
+ * - Dont know what happen when encoder position comes to -32768 and goes to +
+ *        (dont want to test this, please do if you want)
  */
 
 // Includes
@@ -49,7 +52,10 @@ EasyButton diBut4(diB4, buttonDebounceTime, true, false);
 //#define enc2 0
 Encoder enc1(1, 0);
 
-unsigned long enc1PosOld = 0;
+int enc1PosOld = 0;
+int enc1Pos = 0;
+uint8_t encTimerTick = 0;
+bool encOperation = false;
 
 // OLED Variables
 #define SCREEN_WIDTH 128 // OLED display width, in pixels
@@ -111,6 +117,7 @@ void setup()
 /**************************************************/
 void loop()
 {
+  enc1PosOld = enc1Pos;
   readInputs();
   readEncoder();
   lightLED();
@@ -283,22 +290,16 @@ void readInputs()
 
 void readEncoder()
 {
-  unsigned long enc1Pos;
   enc1Pos = enc1.read();
   enc1Pos /= 4;
   uint8_t opNum = 5;
   if (!(enc1Pos == enc1PosOld))
   {
-    Serial.print("Curr = ");
-    Serial.print(enc1Pos);
-    Serial.print("\tOld = ");
-    Serial.print(enc1PosOld);
-    Serial.println();
     if (enc1Pos > enc1PosOld)
     {
       opNum = 1;
     }
-    else 
+    else
     {
       opNum = 0;
     }
@@ -318,18 +319,22 @@ void readEncoder()
       sendMidiCommand(encCCComands[1], encCCType[1]);
     }
   */
-    
   }
   if (opNum < 5)
   {
     sendMidiCommand(encCCComands[opNum], encCCType[opNum]);
+    encTimerTick = 0;
+    encOperation = true;
+    opNum = 5;
   }
-  
-    enc1PosOld = enc1Pos;
 }
 
 void countStateTick()
 {
+  if (encOperation == true)
+  {
+    encTimerTick += 1;
+  }
   for (uint8_t i = 0; i < inArrayLength; i++)
   {
     if (outStates[i] == true)
@@ -353,9 +358,6 @@ void setChanges()
   {
     if (inChangedStates[i] == true)
     {
-      //MIDI.sendControlChange(ccCommands[i],127,1);
-      //Serial.println(ccCommands[i]);
-      //printCommandNum(ccCommands[i], "CC");
       sendMidiCommand(ccCommands[i], ccType[i]);
     }
   }
@@ -371,7 +373,11 @@ void lightLED()
 // Finish stuff after one second
 void oneSecond()
 {
-  secMillisLedCurr = millis();
+  if ((encTimerTick > 9) && (encOperation == true))
+  {
+    writeOledBlank();
+    encOperation = false;
+  }
   for (uint8_t i = 0; i < inArrayLength; i++)
   {
     if ((outStateTick[i] == 10) && outStates[i] == true)
