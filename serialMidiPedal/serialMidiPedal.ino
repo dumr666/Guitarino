@@ -26,10 +26,10 @@
 // IO Defines
 // LED defines
 #define ledPin 13
-#define doL1 15
+#define doL1 16
 #define doL2 14
-#define doL3 16
-#define doL4 8
+#define doL3 15
+#define doL4 10
 // LED states
 short doL1s = LOW;
 short doL2s = LOW;
@@ -71,33 +71,26 @@ SSD1306AsciiWire oled;
 long longTickCnt = 0;
 // ioDLib init
 int timer1TickCounter = 0;
+int oledBlankTick = 0;
 ioDlib pin(ledPin);
-// Instance of the button.
 
 // Button array
-bool bReadChanges = false;
+bool operationProgress = false;
 bool inStates[] = {false, false, false, false};
 bool inOldStates[] = {false, false, false, false};
 bool inChangedStates[] = {false, false, false, false};
 uint8_t inArrayLength = (sizeof(inChangedStates) / sizeof(inChangedStates[0]));
+
+// LED array
+uint8_t outStates[] = {false, false, false, false};
+uint8_t outStateTick[] = {0, 0, 0, 0};
+uint8_t outLEDs[] = {doL1, doL2, doL3, doL4};
 
 //MIDI specific stuffW
 uint8_t ccCommands[] = {111, 81, 3, 4};
 int ccType[] = {1, 1, 2, 2};
 uint8_t encCCComands[] = {85, 86};
 int encCCType[] = {1, 1};
-// LED array
-uint8_t outStates[] = {false, false, false, false};
-uint8_t outStateTick[] = {0, 0, 0, 0};
-uint8_t outLEDs[] = {doL1, doL2, doL3, doL4};
-unsigned long secMillisLedStart[] = {0, 0, 0, 0};
-unsigned long secMillisLedCurr = 0;
-unsigned long secInterval = 0;
-
-unsigned long secMillisStart = 0;
-int randr = 0;
-
-//MIDI_CREATE_DEFAULT_INSTANCE();
 
 /**************************************************/
 /*******   SETUP   ********************************/
@@ -117,9 +110,7 @@ void setup()
 /**************************************************/
 void loop()
 {
-  enc1PosOld = enc1Pos;
   readInputs();
-  readEncoder();
   lightLED();
   oneSecond();
   if (timer1Tick == true)
@@ -135,7 +126,6 @@ void loop()
       //printInputs();
       digitalWrite(13, !digitalRead(13));
       timer1Second();
-      bReadChanges = false;
     }
     //digitalWrite(doL4, !digitalRead(doL4));
     timer1Tick = false;
@@ -182,12 +172,13 @@ void setupOled()
   oled.clear();
   //oled.setLetterSpacing(0);
   oled.setCursor(0, 0);
-  oled.print("SUPRISE");
+  oled.print("DOOM_er");
   oled.setCursor(0, 4);
-  oled.print("motherfucker!");
+  oled.print("GUITARINO!");
   delay(500);
   oled.clear();
-  printBlank();
+  writeOledBlank();
+  oledBlankTick = 11;
 }
 
 void sendMidiCommand(byte cmdNum, int cmdType)
@@ -241,19 +232,6 @@ void writeOledBlank()
   oled.setFont(lcdnums14x24);
   oled.set2X();
   oled.home();
-  oled.print("--");
-  oled.setFont(ZevvPeep8x16);
-  oled.setCursor(100, 0);
-  oled.set2X();
-  oled.print("--");
-}
-
-void printBlank()
-{
-  oled.clear();
-  oled.setFont(lcdnums14x24);
-  oled.set2X();
-  oled.home();
   oled.print("---");
   oled.setFont(ZevvPeep8x16);
   oled.setCursor(100, 0);
@@ -263,6 +241,7 @@ void printBlank()
 
 void readInputs()
 {
+  
   diBut1.read();
   diBut2.read();
   diBut3.read();
@@ -276,16 +255,18 @@ void readInputs()
   {
     if ((inStates[i] == true) && (inChangedStates[i] == false))
     {
-      bReadChanges = true;
       inChangedStates[i] = inStates[i];
     }
     if (inStates[i] == true)
     {
-      secMillisLedStart[i] = millis();
+      oledBlankTick = 0;
       outStateTick[i] = 0;
       outStates[i] = true;
     }
   }
+  // Read encoder
+  enc1PosOld = enc1Pos;
+  readEncoder();
 }
 
 void readEncoder()
@@ -303,34 +284,26 @@ void readEncoder()
     {
       opNum = 0;
     }
-    /*if ((enc1Pos > 1073741700) && (enc1PosOld == 0))
-    {
-      opNum = 0;
-      enc1PosOld = enc1Pos;
-    }
-    else if (enc1Pos < enc1PosOld)
-    {
-      opNum = 0;
-      sendMidiCommand(encCCComands[0], encCCType[0]);
-    }
-    else
-    {
-      opNum = 1;
-      sendMidiCommand(encCCComands[1], encCCType[1]);
-    }
-  */
   }
   if (opNum < 5)
   {
     sendMidiCommand(encCCComands[opNum], encCCType[opNum]);
+    oledBlankTick = 0;
     encTimerTick = 0;
     encOperation = true;
+    outStates[3] = true;
+    outStateTick[3] = 0;
     opNum = 5;
   }
 }
 
 void countStateTick()
 {
+  if (oledBlankTick < 11)
+  {
+    oledBlankTick += 1;
+  }
+
   if (encOperation == true)
   {
     encTimerTick += 1;
@@ -364,26 +337,29 @@ void setChanges()
 }
 
 void lightLED()
-{
-  digitalWrite(doL1, outStates[0]);
-  digitalWrite(doL2, outStates[1]);
-  digitalWrite(doL3, outStates[2]);
+{ 
+  for (uint8_t i = 0; i < inArrayLength; i++)
+  {
+    digitalWrite(outLEDs[i], outStates[i]);
+  }
 }
 
 // Finish stuff after one second
 void oneSecond()
 {
-  if ((encTimerTick > 9) && (encOperation == true))
+  if (oledBlankTick == 10)
   {
     writeOledBlank();
+    oledBlankTick = 11;
+  }
+
+  if ((encTimerTick > 9) && (encOperation == true))
+  {
     encOperation = false;
   }
+
   for (uint8_t i = 0; i < inArrayLength; i++)
   {
-    if ((outStateTick[i] == 10) && outStates[i] == true)
-    {
-      writeOledBlank();
-    }
     if (outStateTick[i] > 9)
     {
       outStates[i] = false;
@@ -396,19 +372,6 @@ void timer1Second()
   longTickCnt++;
   // Set counter for 10hz to 0
   timer1TickCounter = 0;
-}
-
-void printMillis()
-{
-  Serial.print("M1: ");
-  Serial.print(secMillisLedStart[0]);
-
-  Serial.print("M2: ");
-  Serial.print(secMillisLedStart[1]);
-  Serial.print("M3: ");
-  Serial.print(secMillisLedStart[2]);
-  Serial.print("M4: ");
-  Serial.println(secMillisLedStart[3]);
 }
 
 void printInputs()
