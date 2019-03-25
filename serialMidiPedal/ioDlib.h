@@ -27,11 +27,8 @@ extern int diffMillis;
 class ioDlib
 {
 public:
-  ioDlib(int pin);                                         //Constructor. attach pin to blink
-  void blink(bool value);                                  //enable blinking with 1s duration
-  void blink(bool value, int blinkLength);                 //enable blinking with blink duration
-  void blink(bool value, int blinkLength, int blinkLoops); //enable blinking with blink duration and number of loops
-  // Timers and millis
+  ioDlib();                                         //Constructor. attach pin to blink
+   // Timers and millis
   void setupTimer1();                     // setup Timer 1
   static void OCR1A_ISR();                // class interrupt routine
   void clearT1Tick();                     // clear timer1Tick var to false

@@ -17,10 +17,9 @@ int diffMillis = 0;
 
 // Buttons stuff
 
-ioDlib::ioDlib(int pin)
+ioDlib::ioDlib()
 {
-    pinMode(pin, OUTPUT);
-    pinNumber = pin;
+    __asm__("nop\n\t"); 
 }
 
 /*******   INTERRUPT ROUTINES   *******/
@@ -93,53 +92,4 @@ void ioDlib::serialPrintMillis()
     Serial.print("\t|\tToogle val: ");
     Serial.print(timer1Toggle);
     Serial.print("\n");
-}
-
-// Blink stuff, not exactly needed
-void ioDlib::blink(bool value)
-{
-    if (value == true)
-    {
-        digitalWrite(pinNumber, HIGH);
-        delay(1000);
-        digitalWrite(pinNumber, LOW);
-        delay(1000);
-    }
-    else
-    {
-        digitalWrite(pinNumber, LOW);
-    }
-}
-
-void ioDlib::blink(bool value, int blinkLength)
-{
-    if (value == true)
-    {
-        digitalWrite(pinNumber, HIGH);
-        delay(blinkLength);
-        digitalWrite(pinNumber, LOW);
-        delay(blinkLength);
-    }
-    else
-    {
-        digitalWrite(pinNumber, LOW);
-    }
-}
-
-void ioDlib::blink(bool value, int blinkLength, int blinkLoops)
-{
-    if (value == true)
-    {
-        for (int i = 0; i < blinkLoops; i++)
-        {
-            digitalWrite(pinNumber, HIGH);
-            delay(blinkLength);
-            digitalWrite(pinNumber, LOW);
-            delay(blinkLength);
-        }
-    }
-    else
-    {
-        digitalWrite(pinNumber, LOW);
-    }
 }

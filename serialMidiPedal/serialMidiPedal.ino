@@ -24,8 +24,7 @@
 
 // Defines
 // IO Defines
-// LED defines
-#define ledPin 13
+// LED defines 
 #define doL1 16
 #define doL2 14
 #define doL3 15
@@ -72,7 +71,7 @@ long longTickCnt = 0;
 // ioDLib init
 int timer1TickCounter = 0;
 int oledBlankTick = 0;
-ioDlib pin(ledPin);
+ioDlib pin;
 
 // Button array
 bool operationProgress = false;
@@ -175,7 +174,7 @@ void setupOled()
   oled.print("DOOM_er");
   oled.setCursor(0, 4);
   oled.print("GUITARINO!");
-  delay(500);
+  delay(2000);
   oled.clear();
   writeOledBlank();
   oledBlankTick = 11;
